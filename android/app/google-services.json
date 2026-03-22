@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "182815720233",
+    "project_id": "fitora-d3507",
+    "storage_bucket": "fitora-d3507.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:182815720233:android:0dbfb94ab818d8dc6aed38",
+        "android_client_info": {
+          "package_name": "com.example.fitora"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyALmQBcJrmOcnyzQBlpq1_JLaf4yn3NjHY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

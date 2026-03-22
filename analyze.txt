@@ -1,0 +1,11 @@
+﻿Analyzing fitora...                                             
+
+   info - Use 'const' with the constructor to improve performance - lib\screens\member\member_plan.dart:200:97 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\member\member_plan.dart:201:104 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\owner\owner_home.dart:66:13 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\owner\owner_home.dart:68:13 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\owner\owner_home.dart:73:13 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\owner\owner_home.dart:75:13 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\owner\owner_home.dart:80:13 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\owner\owner_home.dart:82:13 - prefer_const_constructors
+
