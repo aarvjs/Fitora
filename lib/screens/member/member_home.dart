@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fitora/core/constants/app_colors.dart';
 
 class MemberHome extends StatefulWidget {
@@ -15,6 +16,9 @@ class _MemberHomeState extends State<MemberHome> {
   String memberName = '';
   String gymName = '';
   String gymId = '';
+  String profileImage = '';
+  String gymPosterUrl = '';
+  String ownerProfileImage = '';
   bool _loading = true;
 
   @override
@@ -27,20 +31,37 @@ class _MemberHomeState extends State<MemberHome> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
     try {
-      final userDoc =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
       final data = userDoc.data();
       if (data != null) {
         final gId = data['gymId'] as String? ?? '';
-        final gymDoc = await FirebaseFirestore.instance
-            .collection('gyms')
-            .doc(gId)
+        final pImg = data['profileImage'] as String? ?? data['avatarUrl'] as String? ?? '';
+        
+        final gymDoc = await FirebaseFirestore.instance.collection('gyms').doc(gId).get();
+        final gymData = gymDoc.data();
+
+        // Fetch Gym Owner Profile Image
+        final ownerQuery = await FirebaseFirestore.instance
+            .collection('users')
+            .where('gymId', isEqualTo: gId)
+            .where('role', isEqualTo: 'owner')
+            .limit(1)
             .get();
+        
+        String ownerImg = gymData?['avatarUrl'] as String? ?? gymData?['profileImage'] as String? ?? '';
+        if (ownerImg.isEmpty && ownerQuery.docs.isNotEmpty) {
+          final ownerData = ownerQuery.docs.first.data();
+          ownerImg = ownerData['profileImage'] as String? ?? ownerData['avatarUrl'] as String? ?? '';
+        }
+
         if (mounted) {
           setState(() {
             memberName = data['name'] as String? ?? 'Member';
+            profileImage = pImg;
             gymId = gId;
-            gymName = gymDoc.data()?['name'] as String? ?? 'Your Gym';
+            gymName = gymData?['name'] as String? ?? 'Your Gym';
+            gymPosterUrl = gymData?['posterUrl'] as String? ?? '';
+            ownerProfileImage = ownerImg;
             _loading = false;
           });
         }
@@ -48,6 +69,13 @@ class _MemberHomeState extends State<MemberHome> {
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Widget _defaultAvatar() {
+    return Container(
+      color: AppColors.surface,
+      child: const Icon(Icons.person_rounded, color: AppColors.textMuted, size: 26),
+    );
   }
 
   @override
@@ -64,7 +92,7 @@ class _MemberHomeState extends State<MemberHome> {
                   children: [
                     _buildHeader(),
                     const SizedBox(height: 28),
-                    _buildGymCard(),
+                    _buildGymSlider(),
                     const SizedBox(height: 28),
                     _buildMotivationCard(),
                     const SizedBox(height: 28),
@@ -91,14 +119,6 @@ class _MemberHomeState extends State<MemberHome> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Hey, 💪',
-                style: GoogleFonts.inter(
-                  fontSize: 15, color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
                 memberName,
                 style: GoogleFonts.inter(
                   fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white,
@@ -106,7 +126,7 @@ class _MemberHomeState extends State<MemberHome> {
                 ),
                 maxLines: 1, overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Container(
@@ -125,49 +145,135 @@ class _MemberHomeState extends State<MemberHome> {
             ],
           ),
         ),
+        // Member Profile Avatar
         Container(
-          width: 50, height: 50,
+          width: 52, height: 52,
           decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.4), width: 2),
+            boxShadow: [BoxShadow(color: Colors.blueAccent.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))],
           ),
-          child: const Icon(Icons.fitness_center_rounded, color: AppColors.primary, size: 24),
+          child: ClipOval(
+            child: profileImage.isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: profileImage,
+                    fit: BoxFit.cover,
+                    width: 52, height: 52,
+                    placeholder: (context, url) => Container(color: AppColors.surface, padding: const EdgeInsets.all(12), child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.blueAccent)),
+                    errorWidget: (context, url, error) => _defaultAvatar(),
+                  )
+                : _defaultAvatar(),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildGymCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.backgroundCard,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Row(
+  Widget _buildGymSlider() {
+    return SizedBox(
+      height: 160,
+      child: PageView(
+        controller: PageController(viewportFraction: 0.95),
+        padEnds: false,
+        physics: const BouncingScrollPhysics(),
         children: [
+          // CARD 1: Gym Owner Info (Half Image, Half Text)
           Container(
-            padding: const EdgeInsets.all(10),
+            margin: const EdgeInsets.only(right: 16),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.white, // Requested white background
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.divider.withValues(alpha: 0.1)),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 15, offset: const Offset(0, 5))],
             ),
-            child: const Icon(Icons.storefront_rounded, color: AppColors.primary, size: 24),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            clipBehavior: Clip.antiAlias, // Important to clip the half-image perfectly
+            child: Row(
               children: [
-                Text('YOUR GYM', style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted, letterSpacing: 1.5, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 4),
-                Text(gymName, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
-                Text('ID: $gymId', style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600, letterSpacing: 1)),
+                // Left Half: Image
+                Expanded(
+                  flex: 4,
+                  child: SizedBox(
+                    height: double.infinity,
+                    child: ownerProfileImage.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: ownerProfileImage,
+                            fit: BoxFit.cover,
+                            errorWidget: (ctx, url, err) => Container(color: AppColors.surface, child: const Center(child: Icon(Icons.storefront_rounded, color: AppColors.textMuted, size: 40))),
+                          )
+                        : Container(color: AppColors.surface, child: const Center(child: Icon(Icons.storefront_rounded, color: AppColors.textMuted, size: 40))),
+                  ),
+                ),
+                // Right Half: Content & Orange Decoration
+                Expanded(
+                  flex: 5,
+                  child: Stack(
+                    children: [
+                      // Orange decorative shape at the bottom right
+                      Positioned(
+                        right: -30,
+                        bottom: -30,
+                        child: Container(
+                          width: 120, height: 120,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.primary.withValues(alpha: 0.15),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: -10,
+                        bottom: -10,
+                        child: Icon(Icons.fitness_center_rounded, size: 80, color: AppColors.primary.withValues(alpha: 0.15)),
+                      ),
+                      // Text Content
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('YOUR GYM', style: GoogleFonts.inter(fontSize: 10, color: AppColors.primary, letterSpacing: 1.5, fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 6),
+                            Text(gymName, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black87, height: 1.2), maxLines: 2, overflow: TextOverflow.ellipsis),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                              child: Text('ID: $gymId', style: GoogleFonts.inter(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
+          ),
+          
+          // CARD 2: Gym Cover Background
+          Container(
+            margin: const EdgeInsets.only(right: 4), // less margin for last item
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.divider),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))],
+              image: gymPosterUrl.isNotEmpty
+                  ? DecorationImage(image: CachedNetworkImageProvider(gymPosterUrl), fit: BoxFit.cover)
+                  : null,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: gymPosterUrl.isEmpty
+                ? const Center(child: Icon(Icons.image_not_supported_rounded, color: AppColors.textMuted, size: 40))
+                : Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: [Colors.black.withValues(alpha: 0.8), Colors.transparent], begin: Alignment.bottomCenter, end: Alignment.topCenter),
+                    ),
+                    alignment: Alignment.bottomLeft,
+                    padding: const EdgeInsets.all(24),
+                    child: Text('Official Gym Cover', style: GoogleFonts.inter(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+                  ),
           ),
         ],
       ),

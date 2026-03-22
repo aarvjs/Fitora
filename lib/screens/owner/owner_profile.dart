@@ -369,25 +369,42 @@ class _OwnerProfileState extends State<OwnerProfile> {
             const SizedBox(height: 40),
 
             // Gym Name Centered
-            Center(
-              child: Column(
-                children: [
-                  Text(
-                    gymName,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), 
-                    decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)), 
-                    child: Text('GYM OWNER', style: GoogleFonts.inter(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.w800, letterSpacing: 1))
-                  ),
-                ],
-              ),
+           Transform.translate(
+  offset: const Offset(0, -40), // 👈 negative value = upar jayega
+  child: Center(
+    child: Column(
+      children: [
+        Text(
+          gymName,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            'GYM OWNER',
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              color: AppColors.primary,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1,
             ),
-            
-            const SizedBox(height: 32),
+          ),
+        ),
+      ],
+    ),
+  ),
+),
             
             // Info Boxes
             Padding(

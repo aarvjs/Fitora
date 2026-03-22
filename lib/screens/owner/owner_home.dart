@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fitora/core/constants/app_colors.dart';
 
 class OwnerHome extends StatefulWidget {
@@ -16,6 +17,7 @@ class OwnerHome extends StatefulWidget {
 class _OwnerHomeState extends State<OwnerHome> {
   String gymName = '';
   String gymId = '';
+  String profileImage = '';
   bool _loading = true;
   int _memberCount = 0;
 
@@ -34,6 +36,11 @@ class _OwnerHomeState extends State<OwnerHome> {
       if (data != null) {
         final gId = data['gymId'] as String? ?? '';
         final gymDoc = await FirebaseFirestore.instance.collection('gyms').doc(gId).get();
+        final gymData = gymDoc.data();
+        
+        // Comprehensive fallback: Some older uploads used 'profileImage', current Edit Profile uses 'avatarUrl'. Owner profile uploads to 'gyms' collection.
+        final pImg = data['profileImage'] as String? ?? data['avatarUrl'] as String? ?? gymData?['avatarUrl'] as String? ?? gymData?['profileImage'] as String? ?? '';
+        
         final membersQuery = await FirebaseFirestore.instance
             .collection('users')
             .where('gymId', isEqualTo: gId)
@@ -42,7 +49,8 @@ class _OwnerHomeState extends State<OwnerHome> {
         if (mounted) {
           setState(() {
             gymId = gId;
-            gymName = gymDoc.data()?['name'] as String? ?? 'Your Gym';
+            gymName = gymData?['name'] as String? ?? 'Your Gym';
+            profileImage = pImg;
             _memberCount = membersQuery.docs.length;
             _loading = false;
           });
@@ -86,21 +94,38 @@ class _OwnerHomeState extends State<OwnerHome> {
     );
   }
 
+  Widget _defaultAvatar() {
+    return Container(
+      color: AppColors.surface,
+      child: const Icon(Icons.person_rounded, color: AppColors.textMuted, size: 26),
+    );
+  }
+
   Widget _buildHeader() {
     final today = DateFormat('EEEE, d MMM').format(DateTime.now());
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       child: Row(
         children: [
-          // Gym avatar
+          // Owner Profile Avatar
           Container(
             width: 52, height: 52,
             decoration: BoxDecoration(
-              gradient: AppColors.primaryGradient,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4))],
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.4), width: 2),
+              boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))],
             ),
-            child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 26),
+            child: ClipOval(
+              child: profileImage.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: profileImage,
+                      fit: BoxFit.cover,
+                      width: 52, height: 52,
+                      placeholder: (context, url) => Container(color: AppColors.surface, padding: const EdgeInsets.all(12), child: const CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+                      errorWidget: (context, url, error) => _defaultAvatar(),
+                    )
+                  : _defaultAvatar(),
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(

@@ -147,19 +147,25 @@ class _MemberPlanState extends State<MemberPlan> {
               ),
               const SizedBox(height: 24),
 
-              // Logs title
+              // Logs title with hint
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text('Your Logs', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
+                child: Row(
+                  children: [
+                    Expanded(child: Text('Your Logs', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white))),
+                    Text('Hold to delete', style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted)),
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
 
-              // Workout logs
-              _WorkoutDietList(uid: _uid!, collection: 'workouts', title: 'Workouts'),
-              const SizedBox(height: 16),
+              // Workout logs (Horizontal row starting with image)
+              _WorkoutDietList(uid: _uid!, collection: 'workouts', title: 'Workouts', imageUrl: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=400&q=80'),
+              
+              const SizedBox(height: 24),
 
-              // Diet logs
-              _WorkoutDietList(uid: _uid!, collection: 'diets', title: 'Diet'),
+              // Diet logs (Horizontal row starting with image)
+              _WorkoutDietList(uid: _uid!, collection: 'diets', title: 'Diet', imageUrl: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=80'),
             ],
           ),
         ),
@@ -207,60 +213,176 @@ class _ActionCard extends StatelessWidget {
   }
 }
 
-// ─────────────── WORKOUT / DIET LOG LIST (plain Widget, not Sliver) ───────────────
+// ─────────────── WORKOUT / DIET LOG LIST (Horizontal Card Style) ───────────────
 class _WorkoutDietList extends StatelessWidget {
   final String uid;
   final String collection;
   final String title;
+  final String imageUrl;
 
-  const _WorkoutDietList({required this.uid, required this.collection, required this.title});
+  const _WorkoutDietList({required this.uid, required this.collection, required this.title, required this.imageUrl});
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection(collection)
-          .where('userId', isEqualTo: uid)
-          .orderBy('createdAt', descending: true)
-          .snapshots(),
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) return const SizedBox.shrink();
-        final docs = snap.data?.docs ?? [];
-        if (docs.isEmpty) return const SizedBox.shrink();
+    final isWorkout = collection == 'workouts';
+    // Green accent color applied across both types as requested
+    const accentColor = Color(0xFF10B981);
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
-              const SizedBox(height: 8),
-              ...docs.map((doc) {
-                final data = doc.data() as Map<String, dynamic>;
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection(collection).where('userId', isEqualTo: uid).snapshots(),
+      builder: (context, snap) {
+        final isLoading = snap.connectionState == ConnectionState.waiting;
+        final docs = snap.data?.docs ?? [];
+        
+        // Sort client-side by createdAt descending
+        docs.sort((a, b) {
+          final aTime = (a.data() as Map)['createdAt'] as Timestamp?;
+          final bTime = (b.data() as Map)['createdAt'] as Timestamp?;
+          if (aTime == null && bTime == null) return 0;
+          if (aTime == null) return 1;
+          if (bTime == null) return -1;
+          return bTime.compareTo(aTime);
+        });
+
+        return SizedBox(
+          height: 140, // Height for compact horizontal cards
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: isLoading ? 2 : (docs.isEmpty ? 2 : docs.length + 1), // +1 for the header image card
+            itemBuilder: (context, index) {
+              
+              // 1. The Header Image Card
+              if (index == 0) {
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  width: 120, // Compact header card
+                  margin: const EdgeInsets.only(right: 12),
                   decoration: BoxDecoration(
-                    color: AppColors.backgroundCard,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(20),
+                    image: DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 10, offset: const Offset(0, 4))],
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      gradient: LinearGradient(
+                        colors: [Colors.black.withValues(alpha: 0.9), Colors.transparent],
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(14),
+                    alignment: Alignment.bottomLeft,
+                    child: Text(
+                      title,
+                      style: GoogleFonts.inter(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                    ),
+                  ),
+                );
+              }
+
+              // 2. Loading State Placeholder
+              if (isLoading && index == 1) {
+                return Container(
+                  width: 160,
+                  margin: const EdgeInsets.only(right: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: AppColors.divider),
                   ),
-                  child: Row(
+                  child: const Center(child: CircularProgressIndicator(color: accentColor)),
+                );
+              }
+
+              // 3. Empty State Card
+              if (docs.isEmpty && index == 1) {
+                return Container(
+                  width: 180,
+                  margin: const EdgeInsets.only(right: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundCard,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                        child: Text(data['day'] ?? '', style: GoogleFonts.inter(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w700)),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(data['text'] ?? '', style: GoogleFonts.inter(color: Colors.white, fontSize: 13), maxLines: 2, overflow: TextOverflow.ellipsis),
-                      ),
+                      Icon(isWorkout ? Icons.fitness_center_rounded : Icons.restaurant_menu_rounded, color: AppColors.textMuted, size: 24),
+                      const SizedBox(height: 8),
+                      Text('No $title added. Tap above to add.', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 12, height: 1.3), textAlign: TextAlign.center),
                     ],
                   ),
                 );
-              }),
-            ],
+              }
+
+              // 4. Actual Data Cards
+              final doc = docs[index - 1]; // Offset index by 1 because of header card
+              final data = doc.data() as Map<String, dynamic>;
+              
+              return GestureDetector(
+                onLongPress: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: AppColors.backgroundCard,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      title: Text('Delete $title', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w800)),
+                      content: Text('Delete this log?', style: GoogleFonts.inter(color: AppColors.textSecondary)),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.inter(color: AppColors.textMuted))),
+                        TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Delete', style: GoogleFonts.inter(color: Colors.redAccent, fontWeight: FontWeight.w700))),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    await FirebaseFirestore.instance.collection(collection).doc(doc.id).delete();
+                  }
+                },
+                child: Container(
+                  width: 160, // Smaller, compact width
+                  margin: const EdgeInsets.only(right: 12),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [AppColors.surface, AppColors.surface.withValues(alpha: 0.5)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: accentColor.withValues(alpha: 0.4), width: 1.5), // Beautiful green accent border
+                    boxShadow: [BoxShadow(color: accentColor.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(color: accentColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
+                            child: Text(data['day'] ?? '', style: GoogleFonts.inter(color: accentColor, fontSize: 10, fontWeight: FontWeight.w800)),
+                          ),
+                          const Spacer(),
+                          const Icon(Icons.more_horiz_rounded, color: AppColors.textMuted, size: 14),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: Text(
+                          data['text'] ?? '',
+                          style: GoogleFonts.inter(color: Colors.white, fontSize: 12, height: 1.4),
+                          maxLines: 4,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         );
       },

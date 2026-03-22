@@ -117,25 +117,97 @@ class _MemberExploreState extends State<MemberExplore> {
                       child: Text('Shop & Supplements', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white)),
                     ),
                     const SizedBox(height: 12),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: GridView.count(
-                        crossAxisCount: 3,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        mainAxisSpacing: 14,
-                        crossAxisSpacing: 14,
-                        childAspectRatio: 0.75,
-                        children: const [
-                          ProductCard(name: 'Whey Protein', price: '4500', imageUrl: 'https://plus.unsplash.com/premium_photo-1664302152996-03fcb53a0dd5?auto=format&fit=crop&q=80&w=300'),
-                          ProductCard(name: 'Creatine', price: '1200', imageUrl: 'https://images.unsplash.com/photo-1593095948071-474c5cc2989d?auto=format&fit=crop&q=80&w=300'),
-                          ProductCard(name: 'Power Belt', price: '850', imageUrl: 'https://images.unsplash.com/photo-1600881333168-2ef49b341f30?auto=format&fit=crop&q=80&w=300'),
-                          ProductCard(name: 'Gym Gloves', price: '450', imageUrl: 'https://images.unsplash.com/photo-1574680096145-d05b474e2155?auto=format&fit=crop&q=80&w=300'),
-                          ProductCard(name: 'Shaker', price: '299', imageUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&q=80&w=300'),
-                          ProductCard(name: 'Yoga Mat', price: '650', imageUrl: 'https://images.unsplash.com/photo-1601925260368-ae2f83cf8b7f?auto=format&fit=crop&q=80&w=300'),
-                        ],
+                    if (_gymId != null)
+                      StreamBuilder<QuerySnapshot>(
+                        // No orderBy to avoid composite index requirement — sort client-side
+                        stream: FirebaseFirestore.instance
+                            .collection('products')
+                            .where('gymId', isEqualTo: _gymId)
+                            .snapshots(),
+                        builder: (context, snap) {
+                          if (snap.connectionState == ConnectionState.waiting) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 20),
+                              child: SizedBox(height: 100, child: Center(child: CircularProgressIndicator(color: AppColors.primary))),
+                            );
+                          }
+                          if (snap.hasError) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              child: Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(color: AppColors.backgroundCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.divider)),
+                                child: Row(children: [
+                                  const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 18),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: Text('Could not load products', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13))),
+                                ]),
+                              ),
+                            );
+                          }
+                          final docs = snap.data?.docs ?? [];
+                          // Sort newest first client-side
+                          docs.sort((a, b) {
+                            final aTime = (a.data() as Map)['createdAt'] as Timestamp?;
+                            final bTime = (b.data() as Map)['createdAt'] as Timestamp?;
+                            if (aTime == null && bTime == null) return 0;
+                            if (aTime == null) return 1;
+                            if (bTime == null) return -1;
+                            return bTime.compareTo(aTime);
+                          });
+                          if (docs.isEmpty) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              child: Container(
+                                padding: const EdgeInsets.all(18),
+                                decoration: BoxDecoration(color: AppColors.backgroundCard, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.divider)),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.inventory_2_outlined, color: AppColors.textMuted, size: 20),
+                                    const SizedBox(width: 10),
+                                    Text('No products available yet', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+                          return GridView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              mainAxisSpacing: 14,
+                              crossAxisSpacing: 14,
+                              childAspectRatio: 0.75,
+                            ),
+                            itemCount: docs.length,
+                            itemBuilder: (context, idx) {
+                              final data = docs[idx].data() as Map<String, dynamic>;
+                              return ProductCard(
+                                name: data['name'] ?? '',
+                                price: data['price'] ?? '0',
+                                imageUrl: data['imageUrl'] as String?,
+                              );
+                            },
+                          );
+                        },
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(color: AppColors.backgroundCard, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.divider)),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline_rounded, color: AppColors.textMuted, size: 20),
+                              const SizedBox(width: 10),
+                              Text('Join a gym to see products', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13)),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -243,7 +315,7 @@ class _PlansRow extends StatelessWidget {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Padding(
             padding: EdgeInsets.symmetric(horizontal: 20),
-            child: SizedBox(height: 100, child: Center(child: CircularProgressIndicator(color: AppColors.primary))),
+            child: SizedBox(height: 90, child: Center(child: CircularProgressIndicator(color: AppColors.primary))),
           );
         }
         final docs = snap.data?.docs ?? [];
@@ -251,11 +323,11 @@ class _PlansRow extends StatelessWidget {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: AppColors.backgroundCard, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.divider)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(color: AppColors.backgroundCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.divider)),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline_rounded, color: AppColors.textMuted, size: 20),
+                  const Icon(Icons.info_outline_rounded, color: AppColors.textMuted, size: 18),
                   const SizedBox(width: 10),
                   Text('No plans available yet', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13)),
                 ],
@@ -264,7 +336,7 @@ class _PlansRow extends StatelessWidget {
           );
         }
         return SizedBox(
-          height: 120,
+          height: 90,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -272,28 +344,28 @@ class _PlansRow extends StatelessWidget {
             itemBuilder: (context, idx) {
               final data = docs[idx].data() as Map<String, dynamic>;
               return Container(
-                width: 150,
+                width: 140,
                 margin: const EdgeInsets.only(right: 12),
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [AppColors.primary.withValues(alpha: 0.9), const Color(0xFF7C3AED)],
+                    colors: [AppColors.primary.withValues(alpha: 0.85), const Color(0xFF7C3AED)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4))],
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.25), blurRadius: 10, offset: const Offset(0, 4))],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Icon(Icons.card_membership_rounded, color: Colors.white70, size: 22),
+                    const Icon(Icons.card_membership_rounded, color: Colors.white70, size: 16),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(data['planName'] ?? 'Plan', style: GoogleFonts.inter(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500)),
-                        Text('₹${data['price'] ?? '0'}', style: GoogleFonts.inter(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+                        Text(data['planName'] ?? 'Plan', style: GoogleFonts.inter(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text('₹${data['price'] ?? '0'}', style: GoogleFonts.inter(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
                       ],
                     ),
                   ],

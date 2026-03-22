@@ -7,6 +7,7 @@ class ProductCard extends StatelessWidget {
   final String price;
   final String? imageUrl;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   const ProductCard({
     super.key,
@@ -14,12 +15,14 @@ class ProductCard extends StatelessWidget {
     required this.price,
     this.imageUrl,
     this.onTap,
+    this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.backgroundCard,
