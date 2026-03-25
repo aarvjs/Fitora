@@ -6,12 +6,13 @@ class CloudinaryService {
   static const String cloudName = 'dnba3dkxk';
   static const String uploadPreset = 'fitora_upload';
 
-  static Future<String?> uploadImage(File imageFile) async {
+  static Future<String?> uploadMedia(File file, bool isVideo) async {
     try {
-      final url = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload');
+      final resourceType = isVideo ? 'video' : 'image';
+      final url = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/$resourceType/upload');
       final request = http.MultipartRequest('POST', url)
         ..fields['upload_preset'] = uploadPreset
-        ..files.add(await http.MultipartFile.fromPath('file', imageFile.path));
+        ..files.add(await http.MultipartFile.fromPath('file', file.path));
 
       final response = await request.send();
       if (response.statusCode == 200) {
@@ -27,18 +28,20 @@ class CloudinaryService {
     }
   }
 
-  /// Extracts the public_id from a Cloudinary secure_url and calls destroy.
-  /// Best-effort: errors are silently swallowed.
-  static Future<void> deleteImage(String imageUrl) async {
+  /// Backwards compatibility wrapper for standard images
+  static Future<String?> uploadImage(File imageFile) async {
+    return await uploadMedia(imageFile, false);
+  }
+
+  static Future<void> deleteMedia(String mediaUrl, {bool isVideo = false}) async {
     try {
-      // URL: https://res.cloudinary.com/<cloud>/image/upload/v<ver>/<public_id>.<ext>
-      final uri = Uri.parse(imageUrl);
+      final resourceType = isVideo ? 'video' : 'image';
+      final uri = Uri.parse(mediaUrl);
       final segments = uri.pathSegments;
       final uploadIdx = segments.indexOf('upload');
       if (uploadIdx == -1 || uploadIdx + 1 >= segments.length) return;
 
       final afterUpload = segments.sublist(uploadIdx + 1);
-      // Skip version segment (v followed by digits)
       final startIdx = (afterUpload.isNotEmpty && RegExp(r'^v\d+$').hasMatch(afterUpload[0])) ? 1 : 0;
       final publicIdWithExt = afterUpload.sublist(startIdx).join('/');
       final publicId = publicIdWithExt.contains('.')
@@ -47,7 +50,7 @@ class CloudinaryService {
 
       if (publicId.isEmpty) return;
 
-      final destroyUrl = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/destroy');
+      final destroyUrl = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/$resourceType/destroy');
       await http.post(destroyUrl, body: {
         'public_id': publicId,
         'upload_preset': uploadPreset,
@@ -55,5 +58,10 @@ class CloudinaryService {
     } catch (_) {
       // Best-effort; ignore errors
     }
+  }
+
+  /// Backwards compatibility wrapper
+  static Future<void> deleteImage(String imageUrl) async {
+    await deleteMedia(imageUrl, isVideo: false);
   }
 }

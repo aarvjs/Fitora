@@ -24,6 +24,8 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
   late Animation<Offset> _card1Slide;
   late Animation<double> _card2Opacity;
   late Animation<Offset> _card2Slide;
+  late Animation<double> _card3Opacity;
+  late Animation<Offset> _card3Slide;
   late Animation<double> _buttonOpacity;
   late Animation<Offset> _buttonSlide;
 
@@ -69,15 +71,25 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
     ).animate(CurvedAnimation(
         parent: _contentController, curve: const Interval(0.2, 0.8, curve: Curves.easeOutCubic)));
 
+    _card3Opacity = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(
+          parent: _contentController, curve: const Interval(0.4, 0.9, curve: Curves.easeOut)),
+    );
+    _card3Slide = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+        parent: _contentController, curve: const Interval(0.4, 0.9, curve: Curves.easeOutCubic)));
+
     _buttonOpacity = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
-          parent: _contentController, curve: const Interval(0.5, 1.0, curve: Curves.easeOut)),
+          parent: _contentController, curve: const Interval(0.6, 1.0, curve: Curves.easeOut)),
     );
     _buttonSlide = Tween<Offset>(
       begin: const Offset(0, 0.4),
       end: Offset.zero,
     ).animate(CurvedAnimation(
-        parent: _contentController, curve: const Interval(0.5, 1.0, curve: Curves.easeOutCubic)));
+        parent: _contentController, curve: const Interval(0.6, 1.0, curve: Curves.easeOutCubic)));
 
     _startAnimations();
   }
@@ -103,6 +115,8 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
       Navigator.pushNamed(context, '/register-owner');
     } else if (_selectedRole == 'member') {
       Navigator.pushNamed(context, '/register-member');
+    } else if (_selectedRole == 'trainer') {
+      Navigator.pushNamed(context, '/register-trainer');
     }
   }
 
@@ -145,6 +159,17 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                       icon: Icons.fitness_center_rounded,
                       accentColor: const Color(0xFF2563EB),
                       extraDetail: 'Workouts · Progress · Schedule',
+                    ),
+                    const SizedBox(height: 16),
+                    _buildCard(
+                      animation: _card3Opacity,
+                      slideAnimation: _card3Slide,
+                      roleKey: 'trainer',
+                      title: 'Fitness Trainer',
+                      description: 'Build profile & post daily routines',
+                      icon: Icons.directions_run_rounded,
+                      accentColor: const Color(0xFF10B981),
+                      extraDetail: 'Global Feed · Profile · Clients',
                     ),
                     const SizedBox(height: 32),
                     _buildContinueButton(),

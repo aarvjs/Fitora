@@ -50,6 +50,8 @@ class _MembershipPlanModalState extends State<MembershipPlanModal> {
         'planName': name,
         'price': price,
         'gymId': gymId,
+        'type': 'membership',
+        'status': 'active',
         'createdAt': FieldValue.serverTimestamp(),
       });
 

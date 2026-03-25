@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:fitora/core/constants/app_colors.dart';
 import 'package:fitora/widgets/product_card.dart';
+import 'package:fitora/screens/owner/video_list_screen.dart';
 
 class MemberExplore extends StatefulWidget {
   const MemberExplore({super.key});
@@ -88,10 +89,22 @@ class _MemberExploreState extends State<MemberExplore> {
                               ],
                             ),
                           ),
-                          Container(
-                            width: 44, height: 44,
-                            decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle, border: Border.all(color: AppColors.divider)),
-                            child: const Icon(Icons.notifications_outlined, color: Colors.white, size: 22),
+                          GestureDetector(
+                            onTap: () {
+                              if (_gymId != null && _gymId!.isNotEmpty) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => VideoListScreen(gymId: _gymId!, isOwner: false),
+                                  ),
+                                );
+                              }
+                            },
+                            child: Container(
+                              width: 44, height: 44,
+                              decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle, border: Border.all(color: AppColors.divider)),
+                              child: const Icon(Icons.play_circle_outline_rounded, color: Colors.white, size: 22),
+                            ),
                           ),
                         ],
                       ),

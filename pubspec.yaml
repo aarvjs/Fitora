@@ -21,6 +21,8 @@ dependencies:
   lottie: ^3.1.2
   smooth_page_indicator: ^1.2.0+3
   timeago: ^3.7.1
+  url_launcher: ^6.3.2
+  video_player: ^2.11.1
   youtube_player_flutter: ^9.0.1
 
 dev_dependencies:
@@ -33,5 +35,11 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/trainer_login_hero.png
+    - assets/trainer_register_hero.png
+    - assets/member_motivation_banner.png
+    - assets/gym_slider_bg.png
+    - assets/gym_motivation_bg.png
+    - assets/gym_final_banner.png
 
 

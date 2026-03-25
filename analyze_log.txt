@@ -1,0 +1,11 @@
+﻿Analyzing owner...                                              
+
+   info - Use 'const' with the constructor to improve performance - lib\screens\owner\owner_explore.dart:371:23 - prefer_const_constructors
+   info - Use 'const' literals as arguments to constructors of '@immutable' classes - lib\screens\owner\owner_explore.dart:372:35 - prefer_const_literals_to_create_immutables
+warning - Unused import: 'dart:io' - lib\screens\owner\owner_home.dart:16:8 - unused_import
+warning - The declaration '_gymGradientBg' isn't referenced - lib\screens\owner\owner_home.dart:558:10 - unused_element
+warning - The declaration '_showAddDialog' isn't referenced - lib\screens\owner\owner_trainers.dart:103:8 - unused_element
+  error - The getter 'background' isn't defined for the type 'AppColors' - lib\screens\owner\video_list_screen.dart:19:34 - undefined_getter
+  error - The getter 'background' isn't defined for the type 'AppColors' - lib\screens\owner\video_list_screen.dart:23:36 - undefined_getter
+   info - Use 'const' with the constructor to improve performance - lib\screens\owner\video_list_screen.dart:225:29 - prefer_const_constructors
+
