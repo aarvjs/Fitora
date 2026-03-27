@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/trainer_post_model.dart';
-import '../models/trainer_model.dart';
 import '../widgets/trainer_post_card.dart';
 import '../services/trainer_auth_service.dart';
 import '../../core/utils/cloudinary_upload.dart';
@@ -65,6 +64,46 @@ class _TrainerActivityScreenState extends State<TrainerActivityScreen> {
     await FirebaseFirestore.instance.collection('posts').doc(post.id).delete();
   }
 
+  Future<Map<String, String>> _getUserDetails(String userId) async {
+    // 1. Check trainers originally
+    final trainerDoc = await FirebaseFirestore.instance.collection('trainers').doc(userId).get();
+    if (trainerDoc.exists && trainerDoc.data() != null) {
+      final data = trainerDoc.data()!;
+      return {
+        'name': data['name'] ?? 'Trainer',
+        'image': data['profileImage'] ?? '',
+        'username': data['username'] ?? '',
+      };
+    }
+
+    // 2. Check users (Members / Owners)
+    final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+    if (userDoc.exists && userDoc.data() != null) {
+      final d = userDoc.data()!;
+      String name = d['name'] ?? d['gymName'] ?? 'Member';
+      String image = d['profileImage'] ?? d['avatarUrl'] ?? '';
+      
+      if ((d['role'] == 'owner' || d['gymId'] != null) && (name == 'Member' || image.isEmpty)) {
+        final gymId = d['gymId'];
+        if (gymId != null && gymId.toString().isNotEmpty) {
+          final gymDoc = await FirebaseFirestore.instance.collection('gyms').doc(gymId).get();
+          if (gymDoc.exists && gymDoc.data() != null) {
+             final gymData = gymDoc.data()!;
+             if (name == 'Member') name = gymData['name'] ?? 'Owner';
+             if (image.isEmpty) image = gymData['avatarUrl'] ?? gymData['profileImage'] ?? '';
+          }
+        }
+      }
+      return {
+        'name': name,
+        'image': image,
+        'username': d['role'] == 'owner' ? 'Gym Owner' : 'Member',
+      };
+    }
+    
+    return {'name': 'User', 'image': '', 'username': ''};
+  }
+
   void _showLikers(String postId) async {
     final likesSnap = await FirebaseFirestore.instance.collection('posts').doc(postId).collection('likes').get();
     final likerIds = likesSnap.docs.map((d) => d.id).toList();
@@ -96,21 +135,28 @@ class _TrainerActivityScreenState extends State<TrainerActivityScreen> {
                 : ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: likerIds.length,
-                    itemBuilder: (ctx, i) => FutureBuilder<DocumentSnapshot>(
-                      future: FirebaseFirestore.instance.collection('trainers').doc(likerIds[i]).get(),
+                    itemBuilder: (ctx, i) => FutureBuilder<Map<String, String>>(
+                      future: _getUserDetails(likerIds[i]),
                       builder: (ctx, snap) {
                         if (!snap.hasData) return const ListTile(leading: CircleAvatar(child: Icon(Icons.person)));
-                        final data = snap.data!.data() as Map<String, dynamic>?;
-                        if (data == null) return const SizedBox.shrink();
-                        final trainer = TrainerModel.fromMap(data, snap.data!.id);
+                        final data = snap.data!;
+                        final name = data['name'] ?? 'User';
+                        final image = data['image'] ?? '';
+                        final subtitle = data['username'] ?? '';
+                        
                         return ListTile(
                           contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           leading: CircleAvatar(
-                            backgroundImage: trainer.profileImage.isNotEmpty ? CachedNetworkImageProvider(trainer.profileImage) : null,
-                            child: trainer.profileImage.isEmpty ? const Icon(Icons.person) : null,
+                            backgroundImage: image.isNotEmpty ? CachedNetworkImageProvider(image) : null,
+                            child: image.isEmpty ? const Icon(Icons.person) : null,
                           ),
-                          title: Text(trainer.name, style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.black87)),
-                          subtitle: Text('@${trainer.username}', style: GoogleFonts.inter(color: Colors.grey[600], fontWeight: FontWeight.w500)),
+                          title: Text(name, style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.black87)),
+                          subtitle: subtitle.isNotEmpty 
+                              ? Text(
+                                  (subtitle == 'Gym Owner' || subtitle == 'Member') ? subtitle : '@$subtitle', 
+                                  style: GoogleFonts.inter(color: Colors.grey[600], fontWeight: FontWeight.w500)
+                                )
+                              : null,
                         );
                       },
                     ),
@@ -161,10 +207,10 @@ class _TrainerActivityScreenState extends State<TrainerActivityScreen> {
             padding: const EdgeInsets.symmetric(vertical: 16),
             itemCount: posts.length,
             itemBuilder: (context, index) {
+              final p = posts[index]; // Define p here
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: TrainerPostCard(
-                  post: posts[index],
+                child: TrainerPostCard(key: ValueKey(p.id), post: p,
                   onDelete: () => _deletePost(posts[index]),
                   onLikesTap: () => _showLikers(posts[index].id),
                 ),

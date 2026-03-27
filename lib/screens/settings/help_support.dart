@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fitora/core/constants/app_colors.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key});
@@ -39,13 +40,39 @@ class HelpSupportScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   Text('It looks like you are experiencing problems with our process. We are here to help so please get in touch with us.', textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary, height: 1.5)),
                   const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity, height: 50,
+                  
+                  // Use IntrinsicWidth so button expands to native width without overflowing
+                  IntrinsicWidth(
                     child: ElevatedButton.icon(
-                      onPressed: () {},
+                      onPressed: () async {
+                        final Uri emailUri = Uri(
+                          scheme: 'mailto',
+                          path: 'arvindyadav70075@gmail.com',
+                          queryParameters: {'subject': 'Fitora App Support Request'},
+                        );
+                        if (await canLaunchUrl(emailUri)) {
+                          await launchUrl(emailUri);
+                        } else {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Could not open email client.')),
+                            );
+                          }
+                        }
+                      },
                       icon: const Icon(Icons.email_rounded, color: Colors.white, size: 20),
-                      label: Text('Email Support', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15, color: Colors.white)),
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                      label: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        child: Text(
+                          'Email: arvindyadav70075@gmail.com',
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
                     ),
                   ),
                 ],

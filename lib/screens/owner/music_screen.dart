@@ -296,14 +296,17 @@ class _MusicScreenState extends State<MusicScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // The hidden youtube player that produces audio
+          // The hidden youtube player that produces audio safely scaled
           if (_youtubeController != null)
-            SizedBox(
-              height: 0,
-              width: 0,
-              child: YoutubePlayer(
-                controller: _youtubeController!,
-                showVideoProgressIndicator: false,
+            Opacity(
+              opacity: 0.01,
+              child: SizedBox(
+                height: 1,
+                width: 1,
+                child: YoutubePlayer(
+                  controller: _youtubeController!,
+                  showVideoProgressIndicator: false,
+                ),
               ),
             ),
             

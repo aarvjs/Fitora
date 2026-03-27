@@ -16,13 +16,13 @@ Future<void> main() async {
     debugPrint('Firebase initialization error: $e');
   }
 
-  runApp(const FitoraApp());
+  runApp(const FitlixApp());
 }
 
 Future<void> _testFirebaseConnection() async {
   try {
     final docRef = await FirebaseFirestore.instance.collection('test').add({
-      'name': 'Fitora Test User',
+      'name': 'Fitlix Test User',
       'timestamp': FieldValue.serverTimestamp(),
       'status': 'Firebase connected',
     });
@@ -32,13 +32,13 @@ Future<void> _testFirebaseConnection() async {
   }
 }
 
-class FitoraApp extends StatelessWidget {
-  const FitoraApp({super.key});
+class FitlixApp extends StatelessWidget {
+  const FitlixApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Fitora',
+      title: 'Fitlix',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       initialRoute: AppRoutes.splash,

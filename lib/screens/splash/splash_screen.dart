@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fitora/core/constants/app_colors.dart';
 import 'package:fitora/core/constants/app_strings.dart';
 import 'package:fitora/routes/app_routes.dart';
@@ -60,13 +62,51 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _startAnimations() async {
-    await Future.delayed(const Duration(milliseconds: 200));
     _logoController.forward();
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 200));
     _textController.forward();
-    await Future.delayed(const Duration(milliseconds: 1800));
+
+    // Minimum delay to show the branding smoothly while Firebase loads in background
+    final minimumWait = Future.delayed(const Duration(milliseconds: 1800));
+    final routeFuture = _getInitialRoute();
+
+    // Wait for BOTH the timer and the auth check to finish
+    final results = await Future.wait([minimumWait, routeFuture]);
+    final routeName = results[1] as String;
+
     if (mounted) {
-      Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
+      Navigator.pushReplacementNamed(context, routeName);
+    }
+  }
+
+  Future<String> _getInitialRoute() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        return AppRoutes.onboarding;
+      }
+
+      // Check users collection (for owners and members)
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        final data = userDoc.data()!;
+        final role = data['role'] as String?;
+        if (role == 'owner') return AppRoutes.ownerDashboard;
+        if (role == 'member') return AppRoutes.memberDashboard;
+        return AppRoutes.onboarding;
+      }
+
+      // Check trainers collection
+      final trainerDoc = await FirebaseFirestore.instance.collection('trainers').doc(user.uid).get();
+      if (trainerDoc.exists) {
+        return AppRoutes.trainerDashboard;
+      }
+
+      // Force sign out if orphaned
+      await FirebaseAuth.instance.signOut();
+      return AppRoutes.onboarding;
+    } catch (e) {
+      return AppRoutes.onboarding;
     }
   }
 
@@ -155,7 +195,7 @@ class _SplashScreenState extends State<SplashScreen>
       child: ClipRRect(
         borderRadius: BorderRadius.circular(32),
         child: Image.asset(
-          'assets/images/logo.jpeg',
+          'assets/applogo.png',
           fit: BoxFit.contain,
           errorBuilder: (_, __, ___) => Container(
             decoration: const BoxDecoration(
@@ -184,7 +224,7 @@ class _SplashScreenState extends State<SplashScreen>
           text: TextSpan(
             children: [
               TextSpan(
-                text: 'FITOR',
+                text: 'FITLI',
                 style: GoogleFonts.inter(
                   fontSize: 40,
                   fontWeight: FontWeight.w900,
@@ -193,7 +233,7 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
               ),
               TextSpan(
-                text: 'A',
+                text: 'X',
                 style: GoogleFonts.inter(
                   fontSize: 40,
                   fontWeight: FontWeight.w900,

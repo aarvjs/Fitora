@@ -9,6 +9,7 @@ import '../../core/constants/app_colors.dart';
 import '../models/trainer_post_model.dart';
 import '../models/trainer_model.dart';
 import '../services/trainer_auth_service.dart';
+import '../services/follow_service.dart';
 import '../screens/trainer_profile_screen.dart'; // Added router integration
 
 class TrainerPostCard extends StatefulWidget {
@@ -31,12 +32,22 @@ class _TrainerPostCardState extends State<TrainerPostCard> {
   int _likesCount = 0;
   int _commentsCount = 0;
   bool _isExpanded = false; // Controls "Read More" logic
+  int _currentImageIndex = 0; // PageView state tracker
 
   @override
   void initState() {
     super.initState();
-    _likesCount = widget.post.likesCount;
-    _commentsCount = widget.post.commentsCount;
+    _likesCount = widget.post.likesCount < 0 ? 0 : widget.post.likesCount;
+    _commentsCount = widget.post.commentsCount < 0 ? 0 : widget.post.commentsCount;
+    
+    // Auto-heal database corruption silently
+    if (widget.post.likesCount < 0 || widget.post.commentsCount < 0) {
+      FirebaseFirestore.instance.collection('posts').doc(widget.post.id).update({
+        if (widget.post.likesCount < 0) 'likesCount': 0,
+        if (widget.post.commentsCount < 0) 'commentsCount': 0,
+      });
+    }
+
     _loadUser();
     _checkInitialLike();
     
@@ -45,9 +56,7 @@ class _TrainerPostCardState extends State<TrainerPostCard> {
          ..initialize().then((_) {
            if (mounted) setState(() {});
          })
-         ..setLooping(true)
-         ..setVolume(0.0)
-         ..play();
+         ..setLooping(true);
     }
   }
 
@@ -60,6 +69,19 @@ class _TrainerPostCardState extends State<TrainerPostCard> {
   Future<void> _loadUser() async {
     final trainer = await _authService.getCurrentTrainer();
     if (mounted) setState(() => _currentTrainer = trainer);
+  }
+
+  @override
+  void didUpdateWidget(TrainerPostCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.post.id == oldWidget.post.id) {
+      if (widget.post.likesCount != oldWidget.post.likesCount) {
+        _likesCount = widget.post.likesCount < 0 ? 0 : widget.post.likesCount;
+      }
+      if (widget.post.commentsCount != oldWidget.post.commentsCount) {
+        _commentsCount = widget.post.commentsCount < 0 ? 0 : widget.post.commentsCount;
+      }
+    }
   }
 
   Future<void> _checkInitialLike() async {
@@ -137,6 +159,63 @@ class _TrainerPostCardState extends State<TrainerPostCard> {
     );
   }
   
+  // ── Compact inline follow chip for post cards ──────────────────────
+  Widget _buildInlineFollowButton(String postTrainerId) {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    // Don't show for own posts or if not logged in
+    if (currentUid == null || currentUid == postTrainerId) {
+      return const SizedBox.shrink();
+    }
+
+    return StreamBuilder<bool>(
+      stream: FollowService().isFollowingStream(postTrainerId),
+      builder: (context, snap) {
+        final isFollowing = snap.data ?? false;
+        return GestureDetector(
+          onTap: () {
+            if (isFollowing) {
+              FollowService().unfollow(postTrainerId);
+            } else {
+              FollowService().follow(postTrainerId);
+            }
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            margin: const EdgeInsets.only(right: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: isFollowing ? Colors.transparent : AppColors.primary,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isFollowing ? AppColors.primary : AppColors.primary,
+                width: 1.4,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isFollowing ? Icons.check_rounded : Icons.add_rounded,
+                  size: 12,
+                  color: isFollowing ? AppColors.primary : Colors.white,
+                ),
+                const SizedBox(width: 3),
+                Text(
+                  isFollowing ? 'Following' : 'Follow',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: isFollowing ? AppColors.primary : Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildDescriptionClamp(String text, {double fontSize = 14}) {
     if (text.isEmpty) return const SizedBox.shrink();
     
@@ -209,12 +288,12 @@ class _TrainerPostCardState extends State<TrainerPostCard> {
                           children: [
                             Text(
                               trainer?.name ?? 'Loading...',
-                              style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87), // Increased weight/color
+                              style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87),
                             ),
                             if (trainer?.username != null)
                                Text(
                                  '@${trainer!.username}',
-                                 style: GoogleFonts.inter(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.w600), // Enforced dark text
+                                 style: GoogleFonts.inter(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.w600),
                                ),
                             Text(
                               timeString,
@@ -223,6 +302,9 @@ class _TrainerPostCardState extends State<TrainerPostCard> {
                           ],
                         ),
                       ),
+                      // ── Inline Follow button (non-owner only) ──────────────
+                      if (trainer != null)
+                        _buildInlineFollowButton(trainer.id),
                       if (widget.onDelete != null)
                         IconButton(
                           icon: const Icon(Icons.more_vert, color: Colors.grey),
@@ -262,43 +344,104 @@ class _TrainerPostCardState extends State<TrainerPostCard> {
               else ...[
                 // Media Layout
                 if (widget.post.mediaUrl.isNotEmpty) ...[
-                  if (widget.post.type == 'video' && _videoController != null && _videoController!.value.isInitialized)
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _videoController!.value.isPlaying ? _videoController!.pause() : _videoController!.play();
-                        });
-                      },
-                      child: AspectRatio(
-                        aspectRatio: _videoController!.value.aspectRatio,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            VideoPlayer(_videoController!),
-                            if (!_videoController!.value.isPlaying)
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: const BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
-                                child: const Icon(Icons.play_arrow, color: Colors.white, size: 40),
-                              )
-                          ],
+                  if (widget.post.type == 'video')
+                    if (_videoController != null && _videoController!.value.isInitialized)
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _videoController!.value.isPlaying ? _videoController!.pause() : _videoController!.play();
+                          });
+                        },
+                        child: AspectRatio(
+                          aspectRatio: _videoController!.value.aspectRatio,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              VideoPlayer(_videoController!),
+                              if (!_videoController!.value.isPlaying)
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: const BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
+                                  child: const Icon(Icons.play_arrow, color: Colors.white, size: 40),
+                                )
+                            ],
+                          ),
                         ),
-                      ),
+                      )
+                    else
+                      Container(
+                        height: 250,
+                        width: double.infinity,
+                        color: Colors.black87,
+                        child: const Center(
+                          child: CircularProgressIndicator(color: Colors.white70),
+                        ),
+                      )
+                  else if (widget.post.mediaUrls != null && widget.post.mediaUrls!.length > 1)
+                    SizedBox(
+                      height: 350,
+                      child: Stack(
+                        alignment: Alignment.bottomCenter,
+                        children: [
+                          PageView.builder(
+                            itemCount: widget.post.mediaUrls!.length,
+                            onPageChanged: (idx) => setState(() => _currentImageIndex = idx),
+                            itemBuilder: (ctx, i) => CachedNetworkImage(
+                              imageUrl: widget.post.mediaUrls![i],
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey[200],
+                                child: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.error, color: Colors.grey),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 12,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(
+                                widget.post.mediaUrls!.length,
+                                (i) => Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _currentImageIndex == i ? AppColors.primary : Colors.white54,
+                                    boxShadow: [
+                                      BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 4)
+                                    ]
+                                  ),
+                                )
+                              )
+                            )
+                          )
+                        ]
+                      )
                     )
                   else
                     CachedNetworkImage(
-                      imageUrl: widget.post.mediaUrl,
+                      imageUrl: widget.post.mediaUrls?.isNotEmpty == true ? widget.post.mediaUrls!.first : widget.post.mediaUrl,
                       fit: BoxFit.cover,
                       width: double.infinity,
                       placeholder: (context, url) => Container(
                         height: 250,
+                        width: double.infinity,
                         color: Colors.grey[200],
-                        child: const Center(child: CircularProgressIndicator()),
+                        child: const Center(
+                          child: CircularProgressIndicator(color: AppColors.primary),
+                        ),
                       ),
                       errorWidget: (context, url, error) => Container(
                         height: 250,
+                        width: double.infinity,
                         color: Colors.grey[200],
-                        child: const Icon(Icons.error, color: Colors.red),
+                        child: const Icon(Icons.error, color: Colors.grey),
                       ),
                     ),
                 ],
@@ -439,8 +582,8 @@ class _CommentsSheetState extends State<_CommentsSheet> {
             userName = d['name'] ?? d['gymName'] ?? 'User';
             userImage = d['profileImage'] ?? d['avatarUrl'] ?? '';
             
-            // If it's an owner or fallback user, pull from Gym collection
-            if ((d['role'] == 'owner' || d['gymId'] != null) && (userName == 'User' || userImage.isEmpty)) {
+            // Only allow Gym fallback for pure Owners; let Members stay blank
+            if (d['role'] == 'owner' && (userName == 'User' || userImage.isEmpty)) {
               final gymId = d['gymId'];
               if (gymId != null && gymId.toString().isNotEmpty) {
                 final gymDoc = await FirebaseFirestore.instance.collection('gyms').doc(gymId).get();

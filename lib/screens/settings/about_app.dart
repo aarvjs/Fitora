@@ -32,7 +32,7 @@ class AboutAppScreen extends StatelessWidget {
               child: const Icon(Icons.fitness_center_rounded, color: Colors.white, size: 50),
             ),
             const SizedBox(height: 24),
-            Text('Fitora', style: GoogleFonts.inter(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -1)),
+            Text('Fitlix', style: GoogleFonts.inter(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -1)),
             const SizedBox(height: 8),
             Text('Version 1.0.0', style: GoogleFonts.inter(fontSize: 16, color: AppColors.primary, fontWeight: FontWeight.w600)),
             const SizedBox(height: 32),

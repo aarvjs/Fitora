@@ -29,9 +29,9 @@ class _TrainerHomeScreenState extends State<TrainerHomeScreen> {
   Stream<QuerySnapshot>? _postsStream;
 
   final List<String> _sliderImages = [
-    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1470&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=1470&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=1470&auto=format&fit=crop',
+    'assets/images/trainer_slider_1.png',
+    'assets/images/trainer_slider_2.png',
+    'assets/images/trainer_slider_3.png',
   ];
 
   @override
@@ -152,7 +152,7 @@ class _TrainerHomeScreenState extends State<TrainerHomeScreen> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(18),
                   image: DecorationImage(
-                    image: NetworkImage(_sliderImages[index]),
+                    image: AssetImage(_sliderImages[index]),
                     fit: BoxFit.cover,
                   ),
                   boxShadow: const [
@@ -404,7 +404,7 @@ class _TrainerHomeScreenState extends State<TrainerHomeScreen> {
             posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(children: posts.map((p) => TrainerPostCard(post: p)).toList()),
+              child: Column(children: posts.map((p) => TrainerPostCard(key: ValueKey(p.id), post: p)).toList()),
             );
           },
         ),

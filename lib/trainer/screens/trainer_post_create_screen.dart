@@ -19,7 +19,7 @@ class TrainerPostCreateScreen extends StatefulWidget {
 }
 
 class _TrainerPostCreateScreenState extends State<TrainerPostCreateScreen> {
-  File? _mediaFile;
+  List<File> _mediaFiles = [];
   bool _isVideo = false;
   bool _isTextMode = false;
   VideoPlayerController? _videoController;
@@ -43,7 +43,7 @@ class _TrainerPostCreateScreenState extends State<TrainerPostCreateScreen> {
           case 'article':
             setState(() {
               _isTextMode = true;
-              _mediaFile = null;
+              _mediaFiles.clear();
               _isVideo = false;
             });
             break;
@@ -61,30 +61,44 @@ class _TrainerPostCreateScreenState extends State<TrainerPostCreateScreen> {
 
   Future<void> _pickMedia(ImageSource source, bool isVideoMode) async {
     final picker = ImagePicker();
-    XFile? pickedFile;
     
     try {
       if (isVideoMode) {
-        pickedFile = await picker.pickVideo(source: source);
-      } else {
-        pickedFile = await picker.pickImage(source: source, imageQuality: 70);
-      }
+        final pickedFile = await picker.pickVideo(source: source);
+        if (pickedFile != null) {
+          setState(() {
+            _mediaFiles = [File(pickedFile.path)];
+            _isVideo = true;
+            _isTextMode = false;
+          });
 
-      if (pickedFile != null) {
-        setState(() {
-          _mediaFile = File(pickedFile!.path);
-          _isVideo = isVideoMode;
-          _isTextMode = false;
-        });
-
-        if (_isVideo) {
           _videoController?.dispose();
-          _videoController = VideoPlayerController.file(_mediaFile!)
+          _videoController = VideoPlayerController.file(_mediaFiles.first)
             ..initialize().then((_) {
               setState(() {});
               _videoController!.setLooping(true);
               _videoController!.play();
             });
+        }
+      } else {
+        if (source == ImageSource.gallery) {
+           final pickedFiles = await picker.pickMultiImage(imageQuality: 70);
+           if (pickedFiles.isNotEmpty) {
+             setState(() {
+               _mediaFiles = pickedFiles.map((x) => File(x.path)).toList();
+               _isVideo = false;
+               _isTextMode = false;
+             });
+           }
+        } else {
+           final pickedFile = await picker.pickImage(source: source, imageQuality: 70);
+           if (pickedFile != null) {
+             setState(() {
+               _mediaFiles = [File(pickedFile.path)];
+               _isVideo = false;
+               _isTextMode = false;
+             });
+           }
         }
       }
     } catch (e) {
@@ -110,7 +124,7 @@ class _TrainerPostCreateScreenState extends State<TrainerPostCreateScreen> {
                 Navigator.pop(ctx); 
                 setState(() {
                   _isTextMode = true;
-                  _mediaFile = null;
+                  _mediaFiles.clear();
                   _isVideo = false;
                   _videoController?.dispose();
                   _videoController = null;
@@ -145,7 +159,7 @@ class _TrainerPostCreateScreenState extends State<TrainerPostCreateScreen> {
   }
 
   Future<void> _uploadPost() async {
-    if (!_isTextMode && _mediaFile == null) {
+    if (!_isTextMode && _mediaFiles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select media or switch to Article mode!')));
       return;
     }
@@ -160,17 +174,23 @@ class _TrainerPostCreateScreenState extends State<TrainerPostCreateScreen> {
     setState(() => _isUploading = true);
     
     try {
-      String? url;
+      List<String> uploadedUrls = [];
       if (!_isTextMode) {
-        url = await CloudinaryService.uploadMedia(_mediaFile!, _isVideo);
-        if (url == null) throw Exception('Failed to upload media to Cloudinary');
+        for (var file in _mediaFiles) {
+          final url = await CloudinaryService.uploadMedia(file, _isVideo);
+          if (url != null) uploadedUrls.add(url);
+        }
+        if (uploadedUrls.isEmpty && _mediaFiles.isNotEmpty) {
+           throw Exception('Failed to upload media to Cloudinary');
+        }
       }
 
       final postRef = FirebaseFirestore.instance.collection('posts').doc();
       final post = TrainerPostModel(
         id: postRef.id,
         trainerId: currentUserId,
-        mediaUrl: url ?? '',
+        mediaUrl: uploadedUrls.isNotEmpty ? uploadedUrls.first : '',
+        mediaUrls: uploadedUrls.isNotEmpty ? uploadedUrls : null,
         type: _isTextMode ? 'text' : (_isVideo ? 'video' : 'image'),
         description: _descController.text.trim(),
         createdAt: DateTime.now(),
@@ -239,14 +259,30 @@ class _TrainerPostCreateScreenState extends State<TrainerPostCreateScreen> {
                    ],
                  ),
                )
-            else if (_mediaFile != null) ...[
+            else if (_mediaFiles.isNotEmpty) ...[
               if (_isVideo && _videoController != null && _videoController!.value.isInitialized)
                 AspectRatio(
                   aspectRatio: _videoController!.value.aspectRatio,
                   child: VideoPlayer(_videoController!),
                 )
               else if (!_isVideo)
-                Image.file(_mediaFile!, height: 300, width: double.infinity, fit: BoxFit.cover),
+                SizedBox(
+                  height: 300,
+                  width: double.infinity,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _mediaFiles.length,
+                    itemBuilder: (ctx, i) {
+                      return Padding(
+                        padding: EdgeInsets.only(right: i == _mediaFiles.length - 1 ? 0 : 8.0),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.file(_mediaFiles[i], height: 300, fit: BoxFit.cover),
+                        )
+                      );
+                    }
+                  )
+                ),
             ],
             
             const SizedBox(height: 24),

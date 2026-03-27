@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fitora/core/constants/app_colors.dart';
 import '../../trainer/models/trainer_post_model.dart';
 import '../../trainer/models/trainer_model.dart';
 import '../../trainer/widgets/trainer_post_card.dart';
 import '../../trainer/screens/trainer_profile_screen.dart';
+import '../../trainer/services/follow_service.dart';
 
 class MemberTrainers extends StatefulWidget {
   const MemberTrainers({super.key});
@@ -22,11 +22,13 @@ class _MemberTrainersState extends State<MemberTrainers> {
   List<TrainerModel> _allTrainers = [];
   List<TrainerModel> _filtered = [];
   bool _loadingTrainers = true;
+  List<String> _followedIds = [];
 
   @override
   void initState() {
     super.initState();
     _loadTrainers();
+    _loadFollowedIds();
   }
 
   @override
@@ -40,6 +42,20 @@ class _MemberTrainersState extends State<MemberTrainers> {
     final snap = await FirebaseFirestore.instance.collection('trainers').get();
     final trainers = snap.docs.map((d) => TrainerModel.fromMap(d.data(), d.id)).toList();
     if (mounted) setState(() { _allTrainers = trainers; _filtered = trainers; _loadingTrainers = false; });
+  }
+
+  Future<void> _loadFollowedIds() async {
+    final ids = await FollowService().getFollowedTrainerIds();
+    if (mounted) setState(() => _followedIds = ids);
+  }
+
+  /// Smart sort: posts from followed trainers first, then others
+  List<TrainerPostModel> _sortedPosts(List<TrainerPostModel> posts) {
+    final followed = posts.where((p) => _followedIds.contains(p.trainerId)).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final others = posts.where((p) => !_followedIds.contains(p.trainerId)).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return [...followed, ...others];
   }
 
   void _onSearch(String query) {
@@ -118,7 +134,7 @@ class _MemberTrainersState extends State<MemberTrainers> {
                     itemCount: _filtered.length,
                     itemBuilder: (_, i) => _trainerTile(_filtered[i]),
                   )
-              // Default: stream of all trainer posts
+              // Default: stream of all trainer posts with smart priority
               : StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
                       .collection('posts')
@@ -131,11 +147,33 @@ class _MemberTrainersState extends State<MemberTrainers> {
                     final docs = snap.data?.docs ?? [];
                     if (docs.isEmpty) return _emptyFeed();
 
-                    final posts = docs.map((d) => TrainerPostModel.fromMap(d.data() as Map<String, dynamic>, d.id)).toList();
-                    return ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                      itemCount: posts.length,
-                      itemBuilder: (_, i) => TrainerPostCard(post: posts[i]),
+                    final rawPosts = docs.map((d) => TrainerPostModel.fromMap(d.data() as Map<String, dynamic>, d.id)).toList();
+                    final posts = _sortedPosts(rawPosts);
+
+                    return RefreshIndicator(
+                      onRefresh: () async => _loadFollowedIds(),
+                      child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                        itemCount: posts.length,
+                        itemBuilder: (_, i) {
+                          final post = posts[i];
+                          final isFirstFollowed = i == 0 && _followedIds.contains(post.trainerId);
+                          final isFirstUnfollowed = i > 0 &&
+                              !_followedIds.contains(post.trainerId) &&
+                              _followedIds.contains(posts[i - 1].trainerId);
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (isFirstFollowed && _followedIds.isNotEmpty)
+                                _sectionLabel('✨ Following', 'From trainers you follow'),
+                              if (isFirstUnfollowed)
+                                _sectionLabel('🌍 Discover', 'More trainers'),
+                              TrainerPostCard(key: ValueKey(post.id), post: post),
+                            ],
+                          );
+                        },
+                      ),
                     );
                   },
                 ),
@@ -199,7 +237,27 @@ class _MemberTrainersState extends State<MemberTrainers> {
       Text('Trainer posts will appear here in real-time.', style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary)),
     ]));
   }
+
+  Widget _sectionLabel(String title, String subtitle) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 12, 0, 4),
+      child: Row(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+              Text(subtitle, style: GoogleFonts.inter(fontSize: 11, color: AppColors.textSecondary)),
+            ],
+          ),
+          const SizedBox(width: 8),
+          const Expanded(child: Divider(color: Color(0xFF2A2A2A))),
+        ],
+      ),
+    );
+  }
 }
+
 
 // ──────────────────────────────────────────────────────────────────
 // SLIVER DELEGATE FOR STICKY SEARCH BAR

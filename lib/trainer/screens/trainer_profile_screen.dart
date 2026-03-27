@@ -11,7 +11,9 @@ import '../../core/utils/cloudinary_upload.dart';
 import '../models/trainer_model.dart';
 import '../models/trainer_post_model.dart';
 import '../services/trainer_auth_service.dart';
+import '../services/follow_service.dart';
 import '../widgets/trainer_post_card.dart';
+import 'trainer_followers_screen.dart';
 
 class TrainerProfileScreen extends StatefulWidget {
   final String? trainerId;
@@ -121,7 +123,7 @@ class _TrainerProfileScreenState extends State<TrainerProfileScreen> {
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Delete Account', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.red)),
-        content: Text('Are you unconditionally sure? This will permanently delete ALL your posts, uploaded media, certifications, and profile data from Fitora.', style: GoogleFonts.inter(color: Colors.black87)),
+        content: Text('Are you unconditionally sure? This will permanently delete ALL your posts, uploaded media, certifications, and profile data from Fitlix.', style: GoogleFonts.inter(color: Colors.black87)),
         actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         actions: [
           TextButton(
@@ -348,18 +350,19 @@ class _TrainerProfileScreenState extends State<TrainerProfileScreen> {
                               final confirm = await showDialog<bool>(
                                 context: context,
                                 builder: (ctx) => AlertDialog(
+                                  backgroundColor: AppColors.surface,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                  title: Text('Logout', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.black87)),
-                                  content: Text('Are you sure you want to logout?', style: GoogleFonts.inter(color: Colors.black87)),
+                                  title: Text('Logout', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.white)),
+                                  content: Text('Are you sure you want to logout?', style: GoogleFonts.inter(color: AppColors.textMuted)),
                                   actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.pop(ctx, false),
-                                      child: Text('Cancel', style: GoogleFonts.inter(color: Colors.grey[700], fontWeight: FontWeight.w600)),
+                                      child: Text('Cancel', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w600)),
                                     ),
                                     ElevatedButton(
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.red,
+                                        backgroundColor: Colors.redAccent,
                                         elevation: 0,
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                       ),
@@ -402,6 +405,87 @@ class _TrainerProfileScreenState extends State<TrainerProfileScreen> {
                 children: [
                   Text(trainer.name, style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87)),
                   Text('@${trainer.username}', style: GoogleFonts.inter(fontSize: 15, color: Colors.black87, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 10),
+
+                  // ── Follower Count (real-time, tappable) ───────────────
+                  StreamBuilder<int>(
+                    stream: FollowService().followerCountStream(trainer.id),
+                    builder: (ctx, snap) {
+                      final count = snap.data ?? 0;
+                      return GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => TrainerFollowersScreen(
+                              trainerId: trainer.id,
+                              trainerName: trainer.name,
+                            ),
+                          ),
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.people_alt_outlined, size: 15, color: AppColors.primary),
+                              const SizedBox(width: 5),
+                              Text(
+                                '$count ${count == 1 ? 'Follower' : 'Followers'}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  // ── Follow / Following button (non-owner only) ─────────
+                  if (!_isOwner) ...[  
+                    const SizedBox(height: 12),
+                    StreamBuilder<bool>(
+                      stream: FollowService().isFollowingStream(trainer.id),
+                      builder: (ctx, snap) {
+                        final isFollowing = snap.data ?? false;
+                        return AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 250),
+                          child: isFollowing
+                              ? OutlinedButton.icon(
+                                  key: const ValueKey('following'),
+                                  onPressed: () => FollowService().unfollow(trainer.id),
+                                  icon: const Icon(Icons.check_rounded, size: 16, color: AppColors.primary),
+                                  label: Text('Following', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppColors.primary)),
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(color: AppColors.primary, width: 1.5),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                                  ),
+                                )
+                              : ElevatedButton.icon(
+                                  key: const ValueKey('follow'),
+                                  onPressed: () => FollowService().follow(trainer.id),
+                                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 16, color: Colors.white),
+                                  label: Text('Follow', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 10),
+                                  ),
+                                ),
+                        );
+                      },
+                    ),
+                  ],
+
                   const SizedBox(height: 24),
                   
                   // Small Cards UI
@@ -450,7 +534,7 @@ class _TrainerProfileScreenState extends State<TrainerProfileScreen> {
           );
           final posts = docs.map((d) => TrainerPostModel.fromMap(d.data() as Map<String, dynamic>, d.id)).toList();
           posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          return Column(children: posts.map((p) => TrainerPostCard(post: p)).toList());
+          return Column(children: posts.map((p) => TrainerPostCard(key: ValueKey(p.id), post: p)).toList());
         },
       ),
     ];

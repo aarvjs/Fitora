@@ -231,7 +231,7 @@ class _OwnerTrainersState extends State<OwnerTrainers> {
                     return ListView.builder(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                       itemCount: posts.length,
-                      itemBuilder: (_, i) => TrainerPostCard(post: posts[i]),
+                      itemBuilder: (_, i) => TrainerPostCard(key: ValueKey(posts[i].id), post: posts[i]),
                     );
                   },
                 ),

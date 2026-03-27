@@ -134,7 +134,7 @@ class _TrainerAuthScreenState extends State<TrainerAuthScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isLogin ? 'Welcome Back,\nTrainer 💪' : 'Join the\nFitora Team 🔥',
+                        isLogin ? 'Welcome Back,\nTrainer 💪' : 'Join the\nFitlix Team 🔥',
                         style: GoogleFonts.inter(fontSize: 30, fontWeight: FontWeight.w900, color: Colors.white, height: 1.2),
                       ),
                       const SizedBox(height: 6),

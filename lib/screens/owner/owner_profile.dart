@@ -9,6 +9,11 @@ import 'package:fitora/core/utils/cloudinary_upload.dart';
 import 'package:fitora/core/constants/app_colors.dart';
 import 'package:fitora/widgets/profile_header.dart';
 import 'package:fitora/widgets/settings_tile.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:fitora/core/services/account_deletion_service.dart';
+import 'package:fitora/routes/app_routes.dart';
+import 'package:fitora/trainer/services/follow_service.dart';
+import 'package:fitora/screens/member/following_list_screen.dart';
 
 class OwnerProfile extends StatefulWidget {
   const OwnerProfile({super.key});
@@ -64,6 +69,56 @@ class _OwnerProfileState extends State<OwnerProfile> {
     await FirebaseAuth.instance.signOut();
     if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(context, '/role-selection', (_) => false);
+  }
+
+  void _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Delete Gym Account', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.white)),
+        content: Text(
+          'CRITICAL WARNING!\n\nAre you absolutely sure? This will delete your Gym profile, ALL your Members, and ALL their data permanently from the database. This action cannot be undone!',
+          style: GoogleFonts.inter(color: Colors.redAccent, fontWeight: FontWeight.w600),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('DELETE ALL', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && _uid != null) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+
+      try {
+        await AccountDeletionService.deleteOwnerAndGymData(_uid!, gymId);
+        if (mounted) {
+          Navigator.pop(context); // Pop loading
+          Navigator.pushNamedAndRemoveUntil(context, '/role-selection', (route) => false);
+        }
+      } catch (e) {
+        if (mounted) {
+          Navigator.pop(context); // Pop loading
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+        }
+      }
+    }
   }
 
   void _copyGymId() {
@@ -363,7 +418,7 @@ class _OwnerProfileState extends State<OwnerProfile> {
               avatarUrl: avatarUrl,
               placeholderInitial: gymName.isNotEmpty ? gymName[0].toUpperCase() : 'G',
               onEdit: _showEditProfile,
-              onDelete: () {}, // Future impl
+              onDelete: _deleteAccount,
               onLogout: _signOut,
             ),
             const SizedBox(height: 40),
@@ -374,14 +429,20 @@ class _OwnerProfileState extends State<OwnerProfile> {
   child: Center(
     child: Column(
       children: [
-        Text(
-          gymName,
-          textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-            color: Colors.white,
-            letterSpacing: -0.5,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              gymName,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: -0.5,
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 8),
@@ -421,7 +482,12 @@ class _OwnerProfileState extends State<OwnerProfile> {
             ),
             
             const SizedBox(height: 40),
-            
+
+            // ── Following Trainers Section ─────────────────────────
+            if (_uid != null) _buildFollowingSection(),
+
+            const SizedBox(height: 40),
+
             // Settings Section
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -496,6 +562,71 @@ class _OwnerProfileState extends State<OwnerProfile> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  // ── Following Trainers Section ────────────────────────────────
+  Widget _buildFollowingSection() {
+    final followsStream = FirebaseFirestore.instance
+        .collection('follows')
+        .where('followerId', isEqualTo: _uid)
+        .snapshots();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: StreamBuilder<QuerySnapshot>(
+        stream: followsStream,
+        builder: (ctx, snap) {
+          final count = snap.data?.docs.length ?? 0;
+
+          return InkWell(
+            onTap: () {
+              if (_uid != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => FollowingListScreen(followerId: _uid!)),
+                );
+              }
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.people_alt_rounded, color: AppColors.primary, size: 20),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Following Trainers', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$count trainers',
+                          style: GoogleFonts.inter(fontSize: 13, color: AppColors.primary, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textMuted, size: 16),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

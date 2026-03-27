@@ -1,7 +1,7 @@
 class AppStrings {
   AppStrings._();
 
-  static const String appName = 'Fitora';
+  static const String appName = 'Fitlix';
   static const String appTagline = 'Power Your Fitness Journey';
 
   static const String onboardingTitle1 = 'Manage Your Gym Smartly';
@@ -22,7 +22,7 @@ class AppStrings {
 
   static const String chooseRole = 'Choose Your Role';
   static const String chooseRoleSubtitle =
-      'Select how you\'d like to use Fitora';
+      'Select how you\'d like to use Fitlix';
 
   static const String gymOwner = 'Gym Owner';
   static const String gymOwnerDesc = 'Manage your gym operations';
